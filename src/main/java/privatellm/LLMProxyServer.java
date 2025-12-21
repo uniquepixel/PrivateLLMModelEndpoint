@@ -11,6 +11,7 @@ import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.concurrent.Executors;
 
@@ -100,7 +101,7 @@ public class LLMProxyServer {
             // Check authentication if API secret is configured
             if (apiSecret != null && !apiSecret.isEmpty()) {
                 String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
-                if (authHeader == null || !authHeader.equals("Bearer " + apiSecret)) {
+                if (!isValidAuthentication(authHeader, apiSecret)) {
                     System.err.println("Authentication failed");
                     sendJsonResponse(exchange, 401, createErrorResponse("Unauthorized. Invalid or missing API secret."));
                     return;
@@ -241,7 +242,21 @@ public class LLMProxyServer {
             // Read response
             int responseCode = conn.getResponseCode();
             if (responseCode != 200) {
-                throw new IOException("LM Studio returned error code: " + responseCode);
+                // Read error stream for debugging
+                String errorBody = "";
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder error = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        error.append(line.trim());
+                    }
+                    errorBody = error.toString();
+                } catch (Exception e) {
+                    // Ignore if error stream cannot be read
+                }
+                throw new IOException("LM Studio returned error code: " + responseCode + 
+                    (errorBody.isEmpty() ? "" : ", body: " + errorBody));
             }
 
             try (BufferedReader br = new BufferedReader(
@@ -290,5 +305,25 @@ public class LLMProxyServer {
         JSONObject error = new JSONObject();
         error.put("error", message);
         return error.toString();
+    }
+
+    /**
+     * Validates authentication using constant-time comparison to prevent timing attacks
+     */
+    private static boolean isValidAuthentication(String authHeader, String expectedSecret) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return false;
+        }
+        
+        String providedSecret = authHeader.substring(7); // Remove "Bearer " prefix
+        
+        // Use constant-time comparison to prevent timing attacks
+        try {
+            byte[] providedBytes = providedSecret.getBytes(StandardCharsets.UTF_8);
+            byte[] expectedBytes = expectedSecret.getBytes(StandardCharsets.UTF_8);
+            return MessageDigest.isEqual(providedBytes, expectedBytes);
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
