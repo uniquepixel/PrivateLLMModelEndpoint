@@ -330,6 +330,205 @@ mvn package
 mvn exec:java -Dexec.mainClass="privatellm.LLMProxyServer"
 ```
 
+## Queue Worker Client
+
+The Queue Worker Client is a standalone application that processes remote queue requests from the crlinkingbot API. It fetches pending linking requests, processes images using local LM Studio to extract Clash Royale player tags, and submits the results back to the remote API.
+
+### What It Does
+
+- Fetches pending linking requests from a remote crlinkingbot server
+- Downloads Clash Royale profile screenshots from the requests
+- Processes images with LM Studio (vision-capable model) to extract player tags
+- Submits results (success or failure) back to the remote API
+- Runs once on-demand and exits when complete
+
+### Prerequisites
+
+1. **LM Studio** with a vision-capable model loaded and running
+   - Go to the "Local Server" tab
+   - Start the server (default: `http://localhost:1234`)
+   - Ensure a vision model is loaded that can process images
+
+2. **Remote API Access**
+   - Access to a crlinkingbot server with queue API
+   - Valid API secret token for authentication
+
+### Configuration
+
+The queue worker uses three environment variables:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `REMOTE_API_URL` | Yes | Base URL of the crlinkingbot API (e.g., `http://your-server.com:8090`) |
+| `QUEUE_API_SECRET` | Yes | Bearer token for authenticating with the remote API |
+| `LM_STUDIO_ENDPOINT` | Yes | Local LM Studio endpoint (e.g., `http://localhost:1234/v1/chat/completions`) |
+
+Update your `.env` file with these values:
+
+```bash
+# Queue Worker Configuration
+REMOTE_API_URL=http://your-server.com:8090
+QUEUE_API_SECRET=your_secret_token_here
+
+# LM Studio Configuration (same as proxy server)
+LM_STUDIO_ENDPOINT=http://localhost:1234/v1/chat/completions
+```
+
+### Running the Queue Worker
+
+#### Using environment variables from .env file
+
+On Linux/Mac:
+```bash
+export $(cat .env | xargs)
+java -jar target/queue-worker-client.jar
+```
+
+On Windows (PowerShell):
+```powershell
+Get-Content .env | ForEach-Object {
+    if ($_ -match '^([^=]+)=(.*)$') {
+        [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+    }
+}
+java -jar target/queue-worker-client.jar
+```
+
+#### Using inline environment variables
+
+On Linux/Mac:
+```bash
+REMOTE_API_URL=http://your-server.com:8090 \
+QUEUE_API_SECRET=your_secret_token \
+LM_STUDIO_ENDPOINT=http://localhost:1234/v1/chat/completions \
+java -jar target/queue-worker-client.jar
+```
+
+On Windows (Command Prompt):
+```cmd
+set REMOTE_API_URL=http://your-server.com:8090
+set QUEUE_API_SECRET=your_secret_token
+set LM_STUDIO_ENDPOINT=http://localhost:1234/v1/chat/completions
+java -jar target/queue-worker-client.jar
+```
+
+### Expected Output
+
+When running, the queue worker displays detailed progress:
+
+```
+Queue Worker Client Starting...
+=================================
+Configuration:
+  Remote API: http://your-server.com:8090
+  LM Studio: http://localhost:1234/v1/chat/completions
+
+Fetching pending requests...
+Found 3 request(s) to process
+
+Processing request 1/3 (ID: abc-123)
+  User: username#1234
+  Images: 2
+  Downloading 2 image(s)...
+  ✓ Downloaded 2 image(s)
+  Analyzing images with LM Studio...
+  ✓ Extracted player tag: #ABC123XYZ
+  ✓ Submitted result
+
+Processing request 2/3 (ID: def-456)
+  User: anotheruser#5678
+  Images: 1
+  Downloading 1 image(s)...
+  ✓ Downloaded 1 image(s)
+  Analyzing images with LM Studio...
+  ✗ Failed to extract player tag
+  ✓ Submitted failure result
+
+Processing request 3/3 (ID: ghi-789)
+  User: thirduser#9012
+  Images: 3
+  Downloading 3 image(s)...
+  ✓ Downloaded 3 image(s)
+  Analyzing images with LM Studio...
+  ✓ Extracted player tag: #2PPXYZ
+  ✓ Submitted result
+
+=================================
+Processing complete!
+Processed: 3
+Success: 2
+Failed: 1
+=================================
+```
+
+### How It Works
+
+1. **Fetch Pending Requests**: Calls `GET /api/queue/pending` on the remote API to retrieve all pending linking requests
+2. **Process Each Request**:
+   - Downloads images from the provided URLs
+   - Converts images to base64 format
+   - Sends images to LM Studio with a German-language prompt
+   - Extracts player tag using regex pattern `#[A-Z0-9]{3,10}`
+3. **Submit Results**: Calls `POST /api/queue/result` with:
+   - Success status
+   - Extracted player tag (if successful)
+   - Error message (if failed)
+4. **Exit**: Program exits with code 0 on success, 1 on critical failure
+
+### Error Handling
+
+The queue worker is designed to be resilient:
+
+- **Individual Request Failures**: If one request fails, processing continues with remaining requests
+- **Network Errors**: Retries are not implemented; failures are logged and submitted back to the API
+- **Invalid Environment Variables**: Program exits immediately with error code 1
+- **LM Studio Unavailable**: Error is logged and failure result is submitted for that request
+
+### Troubleshooting
+
+#### "ERROR: REMOTE_API_URL environment variable is required"
+- **Solution**: Set all three required environment variables before running
+
+#### "GET request failed with code 401"
+- **Solution**: Check that `QUEUE_API_SECRET` matches the expected token on the remote API
+
+#### "LM Studio returned error code"
+- **Solution**: 
+  - Verify LM Studio is running and accessible
+  - Ensure a vision-capable model is loaded
+  - Check the `LM_STUDIO_ENDPOINT` URL is correct
+
+#### "Failed to download any images"
+- **Solution**: 
+  - Check network connectivity to image URLs
+  - Verify image URLs are accessible from your network
+
+#### "Failed to extract player tag"
+- **Solution**: 
+  - The images may not contain a visible player tag
+  - LM Studio model may need to be changed to a better vision model
+  - Check LM Studio logs for processing errors
+
+### Scheduling Periodic Execution
+
+To run the queue worker periodically (e.g., every 5 minutes), use:
+
+**Linux/Mac (cron)**:
+```bash
+*/5 * * * * cd /path/to/project && export $(cat .env | xargs) && java -jar target/queue-worker-client.jar >> queue-worker.log 2>&1
+```
+
+**Windows (Task Scheduler)**:
+Create a batch file `run-queue-worker.bat`:
+```batch
+@echo off
+cd C:\path\to\project
+for /f "tokens=*" %%a in (.env) do set %%a
+java -jar target\queue-worker-client.jar >> queue-worker.log 2>&1
+```
+
+Then schedule it in Task Scheduler to run every 5 minutes.
+
 ## License
 
 This project is provided as-is for integration with LM Studio and private LLM models.
