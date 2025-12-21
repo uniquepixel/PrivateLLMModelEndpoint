@@ -132,7 +132,7 @@ public class QueueWorkerClient {
     /**
      * Fetch all pending requests from remote API
      */
-    List<QueueRequest> fetchPendingRequests() throws IOException {
+    private List<QueueRequest> fetchPendingRequests() throws IOException {
         String response = apiClient.get("/api/queue/pending");
         JSONObject responseJson = new JSONObject(response);
         
@@ -172,7 +172,7 @@ public class QueueWorkerClient {
     /**
      * Process a single request
      */
-    void processRequest(QueueRequest request) throws IOException {
+    private void processRequest(QueueRequest request) throws IOException {
         // Extract player tag using vision service
         String playerTag = visionService.extractPlayerTag(request.imageUrls);
         
@@ -197,7 +197,7 @@ public class QueueWorkerClient {
     /**
      * Submit result back to remote API
      */
-    void submitResult(String requestId, boolean success, String playerTag, String errorMessage) throws IOException {
+    private void submitResult(String requestId, boolean success, String playerTag, String errorMessage) throws IOException {
         JSONObject result = new JSONObject();
         result.put("requestId", requestId);
         result.put("success", success);

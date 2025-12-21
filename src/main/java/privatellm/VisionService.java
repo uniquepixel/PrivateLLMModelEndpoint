@@ -25,7 +25,7 @@ public class VisionService {
         "Analysiere diese Clash Royale Profil-Screenshots und extrahiere den Spieler-Tag.\n\n" +
         "Der Spieler-Tag:\n" +
         "- Beginnt IMMER mit dem # Symbol\n" +
-        "- Enthält 8-10 Zeichen (Großbuchstaben und Zahlen)\n" +
+        "- Enthält 3-10 Zeichen nach dem # (Großbuchstaben und Zahlen)\n" +
         "- Beispiel: #ABC123XYZ oder #2PP\n\n" +
         "WICHTIG:\n" +
         "- Gib NUR den Spieler-Tag zurück, nichts anderes\n" +
@@ -80,7 +80,7 @@ public class VisionService {
     /**
      * Download image from URL to byte array
      */
-    byte[] downloadImage(String imageUrl) throws IOException {
+    private byte[] downloadImage(String imageUrl) throws IOException {
         URL url = new URL(imageUrl);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         
@@ -107,7 +107,7 @@ public class VisionService {
     /**
      * Call LM Studio with images for analysis
      */
-    String callLMStudio(List<byte[]> images) throws IOException {
+    private String callLMStudio(List<byte[]> images) throws IOException {
         URL url = new URL(lmStudioEndpoint);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         
@@ -208,7 +208,7 @@ public class VisionService {
     /**
      * Parse player tag from LM Studio response using regex
      */
-    String parsePlayerTag(String response) {
+    private String parsePlayerTag(String response) {
         if (response == null || response.isEmpty()) {
             return null;
         }
