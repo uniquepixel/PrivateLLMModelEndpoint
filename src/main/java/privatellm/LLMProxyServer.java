@@ -17,12 +17,14 @@ import java.util.concurrent.Executors;
 
 /**
  * LLM Proxy Server for LM Studio Integration
- * Converts Gemini API format to OpenAI/LM Studio format
+ * Converts Gemini API format to OpenAI/LM Studio /v1/chat/completions format
+ * Uses specific model: qwen/qwen2.5-vl-7b
  */
 public class LLMProxyServer {
     private static final int PORT = 8080;
     private static final int CONNECT_TIMEOUT = 30000; // 30 seconds
     private static final int READ_TIMEOUT = 60000; // 60 seconds
+    private static final String DEFAULT_MODEL = "qwen/qwen2.5-vl-7b"; // Specific model to use
     
     private static String lmStudioEndpoint;
     private static String apiSecret;
@@ -30,18 +32,26 @@ public class LLMProxyServer {
     public static void main(String[] args) throws IOException {
         // Load environment variables
         lmStudioEndpoint = System.getenv("LM_STUDIO_ENDPOINT");
+        if (lmStudioEndpoint == null || lmStudioEndpoint.isEmpty()) {
+            lmStudioEndpoint = "http://localhost:1234/v1"; // LM Studio default
+        }
         apiSecret = System.getenv("API_SECRET");
 
-        // Validate required configuration
-        if (lmStudioEndpoint == null || lmStudioEndpoint.isEmpty()) {
-            System.err.println("ERROR: LM_STUDIO_ENDPOINT environment variable is required");
-            System.exit(1);
+        // Ensure LM Studio endpoint ends with /v1
+        if (!lmStudioEndpoint.endsWith("/v1")) {
+            if (lmStudioEndpoint.endsWith("/")) {
+                lmStudioEndpoint = lmStudioEndpoint + "v1";
+            } else {
+                lmStudioEndpoint = lmStudioEndpoint + "/v1";
+            }
         }
 
+        // Validate required configuration
         System.out.println("=================================================");
         System.out.println("LLM Proxy Server for LM Studio Integration");
         System.out.println("=================================================");
         System.out.println("LM Studio Endpoint: " + lmStudioEndpoint);
+        System.out.println("Model: " + DEFAULT_MODEL);
         System.out.println("Authentication: " + (apiSecret != null && !apiSecret.isEmpty() ? "Enabled" : "Disabled"));
         System.out.println("Port: " + PORT);
         System.out.println("=================================================");
@@ -61,6 +71,7 @@ public class LLMProxyServer {
         System.out.println("Server started successfully on port " + PORT);
         System.out.println("Health check: http://localhost:" + PORT + "/health");
         System.out.println("API endpoint: http://localhost:" + PORT + "/api/generate");
+        System.out.println("IMPORTANT: Make sure '" + DEFAULT_MODEL + "' is loaded in LM Studio!");
     }
 
     /**
@@ -79,6 +90,7 @@ public class LLMProxyServer {
             JSONObject response = new JSONObject();
             response.put("status", "healthy");
             response.put("lm_studio_endpoint", lmStudioEndpoint);
+            response.put("model", DEFAULT_MODEL);
             response.put("timestamp", Instant.now().getEpochSecond());
 
             sendJsonResponse(exchange, 200, response.toString());
@@ -113,11 +125,11 @@ public class LLMProxyServer {
                 String requestBody = readRequestBody(exchange);
                 System.out.println("Received Gemini request: " + requestBody);
 
-                // Convert Gemini format to OpenAI format
+                // Convert Gemini format to OpenAI/LM Studio format
                 String openAIRequest = convertGeminiToOpenAI(requestBody);
-                System.out.println("Converted to OpenAI request: " + openAIRequest);
+                System.out.println("Converted to OpenAI/LM Studio request: " + openAIRequest);
 
-                // Forward to LM Studio
+                // Forward to LM Studio /v1/chat/completions
                 String lmStudioResponse = forwardToLMStudio(openAIRequest);
                 System.out.println("Received LM Studio response: " + lmStudioResponse);
 
@@ -136,7 +148,7 @@ public class LLMProxyServer {
         }
 
         /**
-         * Convert Gemini API format to OpenAI format
+         * Convert Gemini API format to OpenAI/LM Studio /v1/chat/completions format
          */
         private String convertGeminiToOpenAI(String geminiRequest) {
             JSONObject geminiJson = new JSONObject(geminiRequest);
@@ -170,6 +182,8 @@ public class LLMProxyServer {
             message.put("content", fullText.toString());
             messages.put(message);
 
+            // LM Studio specific configuration
+            openAIJson.put("model", DEFAULT_MODEL);  // Specify the exact model
             openAIJson.put("messages", messages);
             openAIJson.put("temperature", 0.7);
             openAIJson.put("max_tokens", 2000);
@@ -179,7 +193,7 @@ public class LLMProxyServer {
         }
 
         /**
-         * Convert OpenAI response to Gemini format
+         * Convert OpenAI/LM Studio response to Gemini format
          */
         private String convertOpenAIToGemini(String openAIResponse) {
             JSONObject openAIJson = new JSONObject(openAIResponse);
@@ -221,10 +235,12 @@ public class LLMProxyServer {
         }
 
         /**
-         * Forward request to LM Studio endpoint
+         * Forward request to LM Studio /v1/chat/completions endpoint
          */
         private String forwardToLMStudio(String requestBody) throws IOException {
-            URL url = new URL(lmStudioEndpoint);
+            // Ensure we're hitting the chat/completions endpoint
+            String targetUrl = lmStudioEndpoint + "/chat/completions";
+            URL url = new URL(targetUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             
             conn.setRequestMethod("POST");
