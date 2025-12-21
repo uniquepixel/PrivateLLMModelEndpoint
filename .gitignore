@@ -1,0 +1,40 @@
+# Environment files
+.env
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.classpath
+.project
+.settings/
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Build artifacts
+*.class
+*.jar
+*.war
+*.ear
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+*~
