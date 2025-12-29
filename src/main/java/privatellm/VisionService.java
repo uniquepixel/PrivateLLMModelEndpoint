@@ -226,7 +226,7 @@ public class VisionService {
 		if (response.toUpperCase().contains("NOTAG")) {
 			return "NOTAG";
 		}
-		Set<Character> allowed = Set.of('0', '2', '8', '9', 'P', 'Y', 'L', 'Q', 'G', 'R', 'J', 'C', 'U', 'V', 'O'); // Beispiel
+		Set<Character> allowed = Set.of('#', '0', '2', '8', '9', 'P', 'Y', 'L', 'Q', 'G', 'R', 'J', 'C', 'U', 'V', 'O'); // Beispiel
 
 		Matcher matcher = PLAYER_TAG_PATTERN.matcher(response);
 		if (matcher.find()) { //finde etwas mit #
