@@ -29,7 +29,7 @@ public class VisionService {
 			Dinge wie "Clankriegsveteran" zählen nicht als Tag und sollen somit ignoriert werden.
 			Aufgabe:
 			Finde im Bild das Textfeld mit dem Spielertag.
-			Der Spielertag steht im Profilbereich unter dem Spielernamen und beginnt immer mit # (Beispiel: #2YLJPV0LQ).
+			Der Spielertag steht im Profilbereich unter dem Spielernamen und beginnt immer mit # (Beispiel: #2YLJPV0LQ). Gib dieses # Zeichen unbedingt mit aus
 			Gib ausschließlich den erkannten Spielertag als Text oder "NOTAG" aus, ohne Zusatz, ohne Erklärung, ohne Anführungszeichen.
 			Qualitätsanforderungen:
 			Nutze alle verfügbaren Techniken zur Texterkennung (OCR, Vergrößerung, Schärfung, Rauschunterdrückung), um auch bei Unschärfe oder Kompression den Text korrekt zu lesen.
